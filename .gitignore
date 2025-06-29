@@ -35,3 +35,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 환경 설정 파일 ###
+.env
+*.json
+google-credentials.json

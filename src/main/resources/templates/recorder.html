@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음성 인식 테스트</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .record-section {
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .record-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .record-btn:hover {
+            background-color: #c0392b;
+            transform: scale(1.05);
+        }
+        
+        .record-btn.recording {
+            background-color: #27ae60;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(39, 174, 96, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+        }
+        
+        .status {
+            margin: 20px 0;
+            font-size: 16px;
+            color: #666;
+            min-height: 24px;
+        }
+        
+        .result-section {
+            margin-top: 40px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            min-height: 100px;
+        }
+        
+        .result-label {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .result-text {
+            font-size: 18px;
+            line-height: 1.6;
+            color: #2c3e50;
+            min-height: 50px;
+            white-space: pre-wrap;
+        }
+        
+        .loading {
+            display: none;
+            margin: 20px auto;
+            text-align: center;
+        }
+        
+        .loading::after {
+            content: "⋯";
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: "⋯"; }
+            40% { content: "⋯⋯"; }
+            60%, 100% { content: "⋯⋯⋯"; }
+        }
+        
+        .error {
+            color: #e74c3c;
+            margin-top: 10px;
+        }
+        
+        .mic-icon {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 음성 인식 테스트</h1>
+        
+        <div class="record-section">
+            <button id="recordBtn" class="record-btn">
+                <svg class="mic-icon" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+                <span id="btnText">녹음 시작</span>
+            </button>
+            <div class="status" id="status"></div>
+            <div class="loading" id="loading">음성을 텍스트로 변환중</div>
+        </div>
+        
+        <div class="result-section">
+            <div class="result-label">변환 결과:</div>
+            <div class="result-text" id="result">녹음 버튼을 눌러 음성 인식을 시작하세요.</div>
+        </div>
+        
+        <div class="error" id="error"></div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        const recordBtn = document.getElementById('recordBtn');
+        const btnText = document.getElementById('btnText');
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        const error = document.getElementById('error');
+        const loading = document.getElementById('loading');
+        
+        recordBtn.addEventListener('click', toggleRecording);
+        
+        async function toggleRecording() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+        
+        async function startRecording() {
+            try {
+                // 마이크 권한 요청
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // MediaRecorder 생성
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await uploadAudio(audioBlob);
+                    
+                    // 스트림 정지
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                // 녹음 시작
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI 업데이트
+                recordBtn.classList.add('recording');
+                btnText.textContent = '녹음 중지';
+                status.textContent = '🔴 녹음 중...';
+                error.textContent = '';
+                result.textContent = '';
+                
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                error.textContent = '마이크 접근 권한이 필요합니다.';
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // UI 업데이트
+                recordBtn.classList.remove('recording');
+                btnText.textContent = '녹음 시작';
+                status.textContent = '녹음 완료. 변환 중...';
+                loading.style.display = 'block';
+            }
+        }
+        
+        async function uploadAudio(audioBlob) {
+            try {
+                // 오디오 파일을 WAV로 변환 (더 나은 호환성)
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+                
+                const response = await fetch('/api/speech/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                loading.style.display = 'none';
+                
+                if (data.success) {
+                    status.textContent = '✅ 변환 완료!';
+                    result.textContent = data.transcript;
+                } else {
+                    status.textContent = '❌ 변환 실패';
+                    result.textContent = data.message || '음성을 인식할 수 없습니다.';
+                }
+                
+            } catch (err) {
+                console.error('Upload error:', err);
+                loading.style.display = 'none';
+                status.textContent = '❌ 업로드 실패';
+                error.textContent = '서버와의 통신 중 오류가 발생했습니다.';
+            }
+        }
+        
+        // 브라우저 지원 확인
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            error.textContent = '이 브라우저는 음성 녹음을 지원하지 않습니다.';
+            recordBtn.disabled = true;
+        }
+    </script>
+</body>
+</html>
