@@ -10,4 +10,9 @@ public class WebController {
     public String index() {
         return "recorder";
     }
+    
+    @GetMapping("/recognizer")
+    public String recognizer() {
+        return "recognizer";
+    }
 }

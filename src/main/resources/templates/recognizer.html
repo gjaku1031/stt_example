@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음성 녹음 및 텍스트 변환 (Recognizer 방식)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f7;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 32px;
+            color: #1d1d1f;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: #86868b;
+            font-size: 14px;
+            margin-bottom: 40px;
+        }
+
+        .recording-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #007AFF, #0051D5);
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+        }
+
+        .recording-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+        }
+
+        .recording-button.recording {
+            background: linear-gradient(135deg, #FF3B30, #C1272D);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(255, 59, 48, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+        }
+
+        .status {
+            font-size: 18px;
+            color: #86868b;
+            margin-bottom: 30px;
+            min-height: 24px;
+        }
+
+        .result-box {
+            background-color: #f5f5f7;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 100px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-text {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #1d1d1f;
+            text-align: left;
+        }
+
+        .processing {
+            display: inline-block;
+            margin-left: 10px;
+        }
+
+        .processing::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        .error {
+            color: #FF3B30;
+        }
+
+        .success {
+            color: #34C759;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>음성 녹음 및 변환</h1>
+        <p class="subtitle">Recognizer 방식 (영구 리소스)</p>
+        
+        <button id="recordButton" class="recording-button">
+            <span id="buttonText">녹음 시작</span>
+        </button>
+        
+        <div id="status" class="status">버튼을 눌러 녹음을 시작하세요</div>
+        
+        <div id="resultBox" class="result-box">
+            <div id="resultText" class="result-text"></div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        const recordButton = document.getElementById('recordButton');
+        const buttonText = document.getElementById('buttonText');
+        const status = document.getElementById('status');
+        const resultBox = document.getElementById('resultBox');
+        const resultText = document.getElementById('resultText');
+
+        recordButton.addEventListener('click', toggleRecording);
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await uploadAudio(audioBlob);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordButton.classList.add('recording');
+                buttonText.textContent = '녹음 중지';
+                status.textContent = '녹음 중...';
+                status.classList.remove('error', 'success');
+                resultBox.classList.remove('show');
+            } catch (error) {
+                console.error('마이크 접근 오류:', error);
+                status.textContent = '마이크 접근 권한이 필요합니다';
+                status.classList.add('error');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                recordButton.classList.remove('recording');
+                buttonText.textContent = '녹음 시작';
+                status.innerHTML = '처리 중<span class="processing"></span>';
+            }
+        }
+
+        async function uploadAudio(audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+
+            try {
+                const response = await fetch('/api/recognizer/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    status.textContent = '변환 완료!';
+                    status.classList.add('success');
+                    status.classList.remove('error');
+                    resultText.textContent = result.transcript;
+                    resultBox.classList.add('show');
+                } else {
+                    status.textContent = result.message || '변환 실패';
+                    status.classList.add('error');
+                    status.classList.remove('success');
+                    resultBox.classList.remove('show');
+                }
+            } catch (error) {
+                console.error('업로드 오류:', error);
+                status.textContent = '서버 연결 오류';
+                status.classList.add('error');
+                status.classList.remove('success');
+                resultBox.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>
