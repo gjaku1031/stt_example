@@ -30,7 +30,7 @@ base64 google-credentials.json | tr -d '\n' > encoded.txt
 4. 결과 복사
 
 ### 방법 3: 프로그래밍 방식
-```java
+```
 // Java로 인코딩
 String json = Files.readString(Paths.get("google-credentials.json"));
 String encoded = Base64.getEncoder().encodeToString(json.getBytes());
@@ -47,7 +47,7 @@ System.out.println(encoded);
 
 ### 현재 상황 분석
 
-```properties
+```
 # application.properties와 application-local.properties에서
 google.cloud.credentials.json=${GOOGLE_CREDENTIALS_JSON:기본값...}
 ```
@@ -67,7 +67,7 @@ google.cloud.credentials.json=${GOOGLE_CREDENTIALS_JSON:기본값...}
    - 환경 변수 설정이 없으면 application.properties의 기본값 사용
 
 3. **확인 방법**:
-   ```java
+   ```
    // 실행 중인 설정 확인용 코드 추가
    @PostConstruct
    public void logConfig() {
@@ -81,13 +81,13 @@ google.cloud.credentials.json=${GOOGLE_CREDENTIALS_JSON:기본값...}
 ### 보안을 위한 설정 구조:
 
 1. **개발 환경**:
-   ```properties
+   ```
    # .env (Git에서 제외)
    GOOGLE_CREDENTIALS_JSON=실제_base64_인코딩된_자격증명
    ```
 
 2. **application.properties**:
-   ```properties
+   ```
    # 기본값 없이 환경 변수만 참조
    google.cloud.credentials.json=${GOOGLE_CREDENTIALS_JSON}
    ```
@@ -98,4 +98,3 @@ google.cloud.credentials.json=${GOOGLE_CREDENTIALS_JSON:기본값...}
    *.json
    google-credentials.json
    ```
-
